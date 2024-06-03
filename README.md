@@ -1,5 +1,5 @@
 # mgga-postanalysis
-R code to slope-correct values of CH4 and CO2 measured via MGGA. The gas concentration is measured via an injection loop attached to MGGA; either low change from baseline (~15ppb) or too low in general (&lt; atmospheric levels, equal to &lt; 1.9ppm) need to be slope-corrected. Samples are processed in parallel. 
+Script for R to slope-correct values of CH4 and CO2 measured via MGGA. The gas concentration is measured via an injection loop attached to MGGA; either low change from baseline (~15ppb) or too low in general (&lt; atmospheric levels, equal to &lt; 1.9ppm) need to be slope-corrected. Samples are processed in parallel. 
 
 The last 20 points of baseline data are used for a linear model -> data points are adjusted accordingly. *crucial part: identifying the 'baseline_end' point (BEFORE sample injection but as-close-as possible).
 All sample data [period: 'sample_start' - 'sample_end'] are slope-adjusted (green line); the highest 20-point window is averaged (both adjusted and unadjusted). *crucial part: the 'sample_end' time, only if data points AFTER the sample period are HIGHER than sample points.
