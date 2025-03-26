@@ -34,6 +34,10 @@ head(data)
 # Read the CSV file with sample periods
 times_data <- fread("sample-period-times.csv")
 head(times_data)
+# Set column names from first row
+#colnames(times_data) <- as.character(times_data[1, ])  
+#times_data <- times_data[-1, ] # Remove the header (1st row)
+head(times_data)
 times_data
 
 # Convert times to POSIXct format
