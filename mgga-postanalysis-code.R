@@ -1,5 +1,5 @@
-#### mgga-postanalysis
-# Petra Klimova, 03-06-2024, ptklimova@gmail.com
+#### mgga-postanalysis v 1.02 ####
+# Petra Klimova, 01-04-2025, ptklimova@gmail.com
 # designed with: R version 4.1.1 (2021-08-10) Kick Things, ggplot2 (v. 3.4.0), data.table (v. 1.14.2)
 
 ### Script for R to slope-correct values of CH4 and CO2 measured via MGGA. The gas concentration is 
@@ -9,8 +9,9 @@
 
 ### The last 20 points of baseline data are used for a linear model -> data points are adjusted 
 # accordingly. *crucial part: identifying the 'baseline_end' point (BEFORE sample injection but 
-# as-close-as possible). All sample data [period: 'sample_start' - 'sample_end'] are slope-adjusted 
-# (green line); the highest 20-point window is averaged (both adjusted and unadjusted). 
+# close). All sample data [period: 'sample_start' - 'sample_end'] are slope-adjusted 
+# (green line); the highest 20-point window is averaged (both adjusted and unadjusted), also the lowest
+# 2-point window is avg (unadjusted).
 # *crucial part: the 'sample_end' time, only if data points AFTER the sample period are HIGHER than 
 # sample points. --> Check crucial parts using graphic output for each sample and gas; make adjustments 
 # in csv sample periods time when necessary.
@@ -18,21 +19,20 @@
 ### Input files (available as example): "sample-period-times.csv", "mgga-time-ch4-co2.csv" 
 # ..note that some CH4 concentration are above atmospheric ;-)
 
-
 # Set working directory
-setwd("C:/Users/.../")
+setwd("C:/Users/PetraV/Google Drive/SCiENCE/cryoeco/_MGGA injection loop/28-03-2025")
 
 # Load necessary libraries
 library(ggplot2)
 library(data.table)
 
 # Read data from file
-data <- read.csv("mgga-time-ch4-co2.csv")
+data <- read.csv("28-03_mgga-time-ch4-co2.csv")
 colnames(data) <- c('time', 'CH4', 'CO2')
 head(data)
 
 # Read the CSV file with sample periods
-times_data <- fread("sample-period-times.csv")
+times_data <- fread("28-03_anoxme_sample-period-times.csv")
 head(times_data)
 # Set column names from first row
 #colnames(times_data) <- as.character(times_data[1, ])  
@@ -69,7 +69,9 @@ data$Time <- as.POSIXct(data$time, format = "%H:%M:%S")
 results_CH4 <- list()
 results_CO2 <- list()
 
-# Process each period
+
+###### Process each period #####
+# including avg, min avg and max avg sample window
 for (sample_name in names(periods)) {
   period <- periods[[sample_name]]
   
@@ -89,7 +91,7 @@ for (sample_name in names(periods)) {
     
     # Function to process each gas (CH4 and CO2)
     process_gas <- function(gas) {
-      # Use only the last 20 points of baseline_data
+      # Use only the last 20 points of baseline_data (adjust the number of points)
       if (nrow(baseline_data) > 20) {
         baseline_window <- tail(baseline_data, 20)
       } else {
@@ -112,46 +114,50 @@ for (sample_name in names(periods)) {
       # Create a data frame to store all windows of adjusted gas
       all_windows <- data.frame()
       
-      # Find 20-point window with the highest average values in sample data (adjusted)
+      # Initialize variables for finding windows
       max_avg_window_adjusted <- NULL
       max_avg_value_adjusted <- -Inf
+      min_avg_window_unadjusted <- NULL
+      min_avg_value_unadjusted <- Inf
+      max_avg_window_unadjusted <- NULL
+      max_avg_value_unadjusted <- -Inf
       
       for (i in 1:(nrow(sample_data) - 20 + 1)) {
         window_data <- sample_data[i:(i + 20 - 1), ]
         window_avg_value_adjusted <- mean(window_data[[paste("Adjusted", gas, sep = "_")]])
+        window_avg_value_unadjusted <- mean(window_data[[gas]])
         
+        # Check for max adjusted window
         if (window_avg_value_adjusted > max_avg_value_adjusted) {
           max_avg_value_adjusted <- window_avg_value_adjusted
           max_avg_window_adjusted <- window_data
+        }
+        
+        # Check for min unadjusted window
+        if (window_avg_value_unadjusted < min_avg_value_unadjusted) {
+          min_avg_value_unadjusted <- window_avg_value_unadjusted
+          min_avg_window_unadjusted <- window_data
+        }
+        
+        # Check for max unadjusted window
+        if (window_avg_value_unadjusted > max_avg_value_unadjusted) {
+          max_avg_value_unadjusted <- window_avg_value_unadjusted
+          max_avg_window_unadjusted <- window_data
         }
         
         # Append the current window to all_windows
         all_windows <- rbind(all_windows, window_data)
       }
       
-      # Calculate the average concentration in the max average window (adjusted)
+      # Calculate window averages
       max_window_average_adjusted <- if (!is.null(max_avg_window_adjusted)) mean(max_avg_window_adjusted[[paste("Adjusted", gas, sep = "_")]]) else NA
-      
-      # Find 20-point window with the highest average values in sample data (unadjusted)
-      max_avg_window_unadjusted <- NULL
-      max_avg_value_unadjusted <- -Inf
-      
-      for (i in 1:(nrow(sample_data) - 20 + 1)) {
-        window_data <- sample_data[i:(i + 20 - 1), ]
-        window_avg_value_unadjusted <- mean(window_data[[gas]])
-        
-        if (window_avg_value_unadjusted > max_avg_value_unadjusted) {
-          max_avg_value_unadjusted <- window_avg_value_unadjusted
-          max_avg_window_unadjusted <- window_data
-        }
-      }
-      
-      # Calculate the average concentration in the max average window (unadjusted)
+      min_window_avg_unadjusted <- if (!is.null(min_avg_window_unadjusted)) mean(min_avg_window_unadjusted[[gas]]) else NA
       max_window_avg_unadjusted <- if (!is.null(max_avg_window_unadjusted)) mean(max_avg_window_unadjusted[[gas]]) else NA
       
       # Calculate differences
       diff_unadj <- max_window_avg_unadjusted - baseline_average_unadjusted
       diff_adj <- max_window_average_adjusted - baseline_average_adjusted
+      diff_low_unadj <- min_window_avg_unadjusted - baseline_average_unadjusted
       
       # Return results
       list(
@@ -160,12 +166,15 @@ for (sample_name in names(periods)) {
         baseline_average_adjusted = baseline_average_adjusted,
         max_window_average_adjusted = max_window_average_adjusted,
         max_window_avg_unadjusted = max_window_avg_unadjusted,
+        min_window_avg_unadjusted = min_window_avg_unadjusted,
         diff_unadj = diff_unadj,
         diff_adj = diff_adj,
+        diff_low_unadj = diff_low_unadj,
         all_windows = all_windows,
-        baseline_window = baseline_window,  # Include this
-        max_avg_window_adjusted = max_avg_window_adjusted,  # Include this
-        max_avg_window_unadjusted = max_avg_window_unadjusted  # Include this
+        baseline_window = baseline_window,
+        max_avg_window_adjusted = max_avg_window_adjusted,
+        max_avg_window_unadjusted = max_avg_window_unadjusted,
+        min_avg_window_unadjusted = min_avg_window_unadjusted
       )
     }
     
@@ -184,22 +193,24 @@ for (sample_name in names(periods)) {
       geom_point(data = sample_data, aes(x = Time, y = CH4, color = "Sample CH4"), alpha=0.8) +
       geom_line(data = result_CH4$all_windows, aes(x = Time, y = Adjusted_CH4, color = "Adjusted CH4"), alpha = 0.5) +
       geom_point(data = result_CH4$max_avg_window_adjusted, aes(x = Time, y = Adjusted_CH4, color = "Adjusted CH4 max"), alpha = 0.8) + 
-      geom_line(data = result_CH4$baseline_window, aes(x = Time, y = Adjusted_CH4, color = "Baseline CH4 last 20"), alpha = 0.5) +  # Add this line
-      geom_point(data = result_CH4$baseline_window, aes(x = Time, y = Adjusted_CH4, color = "Baseline CH4 last 20"), alpha = 0.8) +  # Add this line
+      geom_point(data = result_CH4$min_avg_window_unadjusted, aes(x = Time, y = CH4, color = "Lowest CH4 window"), alpha = 0.8) +  # NEW: Show lowest window
+      geom_line(data = result_CH4$baseline_window, aes(x = Time, y = Adjusted_CH4, color = "Baseline CH4 last 20"), alpha = 0.5) +
+      geom_point(data = result_CH4$baseline_window, aes(x = Time, y = Adjusted_CH4, color = "Baseline CH4 last 20"), alpha = 0.8) +
       scale_color_manual(values = c("CH4 concentration" = "black", 
                                     "Baseline CH4" = "blue",                                    
                                     "Sample CH4" = "red", 
                                     "Adjusted CH4" = "green",
                                     "Adjusted CH4 max" = "darkgreen",
-                                    "Baseline CH4 last 20" = "purple")) +  # Add this line
+                                    "Lowest CH4 window" = "orange",  # NEW: Color for lowest window
+                                    "Baseline CH4 last 20" = "purple")) +
       labs(title = paste("CH4 Concentration Over Time for", sample_name),
            x = "Time",
            y = "CH4 Concentration (ppm)") +
       theme_minimal() +
       theme(legend.position = "bottom", legend.justification = "right") +
       guides(color = guide_legend(order = 1, 
-                                  override.aes = list(linetype = c(1, 0, 0, 1, 1, 0), 
-                                                      shape = c(NA, 16, 16, NA, NA, 16))))  # Add this line
+                                  override.aes = list(linetype = c(1, 0, 0, 1, 1, 0, 0), 
+                                                      shape = c(NA, 16, 16, NA, NA, 16, 16))))  # Updated for new legend item
     print(p_CH4)
     
     # Save plot to a file for CH4
@@ -212,22 +223,24 @@ for (sample_name in names(periods)) {
       geom_point(data = sample_data, aes(x = Time, y = CO2, color = "Sample CO2"), alpha=0.8) +
       geom_line(data = result_CO2$all_windows, aes(x = Time, y = Adjusted_CO2, color = "Adjusted CO2"), alpha = 0.5) +
       geom_point(data = result_CO2$max_avg_window_adjusted, aes(x = Time, y = Adjusted_CO2, color = "Adjusted CO2 max"), alpha = 0.8) +
-      geom_line(data = result_CO2$baseline_window, aes(x = Time, y = Adjusted_CO2, color = "Baseline CO2 last 20"), alpha = 0.5) +  # Add this line
-      geom_point(data = result_CO2$baseline_window, aes(x = Time, y = Adjusted_CO2, color = "Baseline CO2 last 20"), alpha = 0.8) +  # Add this line
+      geom_point(data = result_CO2$min_avg_window_unadjusted, aes(x = Time, y = CO2, color = "Lowest CO2 window"), alpha = 0.8) +  # NEW: Show lowest window
+      geom_line(data = result_CO2$baseline_window, aes(x = Time, y = Adjusted_CO2, color = "Baseline CO2 last 20"), alpha = 0.5) +
+      geom_point(data = result_CO2$baseline_window, aes(x = Time, y = Adjusted_CO2, color = "Baseline CO2 last 20"), alpha = 0.8) +
       scale_color_manual(values = c("CO2 concentration" = "black", 
                                     "Baseline CO2" = "blue", 
                                     "Sample CO2" = "red", 
                                     "Adjusted CO2" = "green",
                                     "Adjusted CO2 max" = "darkgreen",
-                                    "Baseline CO2 last 20" = "purple")) +  # Add this line
+                                    "Lowest CO2 window" = "orange",  # NEW: Color for lowest window
+                                    "Baseline CO2 last 20" = "purple")) +
       labs(title = paste("CO2 Concentration Over Time for", sample_name),
            x = "Time",
            y = "CO2 Concentration (ppm)") +
       theme_minimal() +
       theme(legend.position = "bottom", legend.justification = "right") +
       guides(color = guide_legend(order = 1, 
-                                  override.aes = list(linetype = c(1, 0, 0, 1, 1, 0), 
-                                                      shape = c(NA, 16, 16, NA, NA, 16))))  # Add this line
+                                  override.aes = list(linetype = c(1, 0, 0, 1, 1, 0, 0), 
+                                                      shape = c(NA, 16, 16, NA, NA, 16, 16))))  # Updated for new legend item
     print(p_CO2)
     
     # Save plot to a file for CO2
@@ -239,8 +252,10 @@ for (sample_name in names(periods)) {
       baseline_average_adjusted = NA,
       max_window_average_adjusted = NA,
       max_window_avg_unadjusted = NA,
+      min_window_avg_unadjusted = NA,
       diff_unadj = NA,
-      diff_adj = NA
+      diff_adj = NA,
+      diff_low_unadj = NA
     )
     results_CO2[[sample_name]] <- list(
       baseline_slope = NA,
@@ -248,14 +263,19 @@ for (sample_name in names(periods)) {
       baseline_average_adjusted = NA,
       max_window_average_adjusted = NA,
       max_window_avg_unadjusted = NA,
+      min_window_avg_unadjusted = NA,
       diff_unadj = NA,
-      diff_adj = NA
+      diff_adj = NA,
+      diff_low_unadj = NA
     )
   }
 }
 
+## NOW check the figures -> if needed, adjust periods/times in 'sample-period-times.csv' and process again
+#####
 
-# CH4 results
+
+ # CH4 results
 # Convert results to a data frame for printing
 results_df_CH4 <- do.call(rbind, lapply(names(results_CH4), function(name) {
   res <- results_CH4[[name]]
@@ -282,3 +302,4 @@ results_df_CO2 <- results_df_CO2[, c("sample_name",  "baseline_average_unadjuste
 # Print results for CO2
 print(results_df_CO2)
 write.csv(results_df_CO2, "results_df_CO2.csv", row.names=FALSE)
+
