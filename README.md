@@ -1,11 +1,11 @@
-# mgga-postanalysis (v. 1.01)
+# mgga-postanalysis (v. 1.02)
 R code script to adjust values of CH4 and CO2 measured via MGGA based on a linear increase in gas concentration in a closed system (like an injection loop). The gas concentration is measured using MGGA and a closed-loop method (see Wilkinson et al 2018 https://doi.org/10.1371/journal.pone.0193973), with the loop flushed and filled with 5.5 grade N2-gas. Either low change from baseline (~15ppb) or values too low in general (&lt; atmospheric levels, equal to &lt; 1.9ppm) need to be slope-corrected. Samples are processed in parallel, visualized in graphic outputs, and averages of both, unadjusted and adjusted values and their differences are saved in individual files for CH4 and CO2. 
 
-DISCLAIMER: Always mind your data nature and check your results. 
+DISCLAIMER: Always mind the nature of your data and check your results. 
 Please, let me know how the code has worked for you! Good luck!
 
 Only the last 20 points of baseline data are used for a linear model. *crucial part: identifying the 'baseline_end' point (BEFORE sample injection but as-close-as possible).
-Sample data [period: 'sample_start' - 'sample_end'] are slope-adjusted, and the highest 20-point window is averaged (both adjusted and unadjusted). *crucial part: the 'sample_end' time, only if data points AFTER the sample period are HIGHER than sample points.
+Sample data [period: 'sample_start' - 'sample_end'] are slope-adjusted, and the highest 20-point window is averaged (both adjusted and unadjusted). The lowest 20-point (unadjusted) is now also averaged. *crucial part: the 'sample_end' time, only if data points AFTER the sample period are HIGHER than sample points.
 --> Check for the correct times using graphic outputs; adjust times in csv file when necessary. 
 
 Important: 20-point windows are a good size for gas concentration measurements taken by MGGA every 1 second; adjust your measurement settings OR consider narrower windows (e.g. if you have a 3s average, consider a 7-point window).
